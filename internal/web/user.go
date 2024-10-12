@@ -17,6 +17,8 @@ type UserHandler struct {
 	passwordRex *regexp.Regexp
 }
 
+// 预编译提高校验速度
+
 func NewUserHandler() *UserHandler {
 	return &UserHandler{
 		emailRexExp: regexp.MustCompile(emailRegexPattern, regexp.None),
