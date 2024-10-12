@@ -1,6 +1,7 @@
 package web
 
 import (
+	"SimShare/internal/service"
 	"fmt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-gonic/gin"
@@ -15,14 +16,16 @@ const (
 type UserHandler struct {
 	emailRexExp *regexp.Regexp
 	passwordRex *regexp.Regexp
+	svc         *service.UserService
 }
 
 // 预编译提高校验速度
 
-func NewUserHandler() *UserHandler {
+func NewUserHandler(svc *service.UserService) *UserHandler {
 	return &UserHandler{
 		emailRexExp: regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRex: regexp.MustCompile(passwordRegexPattern, regexp.None),
+		svc:         svc,
 	}
 }
 
