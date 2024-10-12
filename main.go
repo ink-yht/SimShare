@@ -1,17 +1,15 @@
 package main
 
 import (
+	"SimShare/internal/web"
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
 func main() {
 	server := gin.Default()
-	server.GET("/hello", func(ctx *gin.Context) {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 0,
-			"msg":  "Hello World！",
-		})
-	})
+
+	u := web.NewUserHandler()
+
+	u.RegisterRouters(server)
 	server.Run(":8080")
 }
