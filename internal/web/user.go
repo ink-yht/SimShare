@@ -1,6 +1,7 @@
 package web
 
 import (
+	"SimShare/internal/domain"
 	"SimShare/internal/service"
 	"fmt"
 	regexp "github.com/dlclark/regexp2"
@@ -89,6 +90,30 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{
 			"code": 1,
 			"msg":  "密码必须包含数字、字母、特殊字符，且不少于八位",
+		})
+		return
+	}
+
+	err = h.svc.SignUp(ctx, domain.User{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	// err 有两种情况
+	// 1.系统错误
+	// 2.邮箱已注册
+
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 2,
+			"msg":  "系统错误",
+		})
+		return
+	}
+
+	if err == service.ErrDuplicateEmail {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 1,
+			"msg":  "邮箱已被注册",
 		})
 		return
 	}

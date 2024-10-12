@@ -1,6 +1,16 @@
 package dao
 
-import "gorm.io/gorm"
+import (
+	"context"
+	"errors"
+	"github.com/go-sql-driver/mysql"
+	"gorm.io/gorm"
+	"time"
+)
+
+var (
+	ErrDuplicateEmail = errors.New("邮箱冲突")
+)
 
 type User struct {
 	Id       int64  `gorm:"primaryKey,autoIncrement"`
@@ -18,4 +28,27 @@ type UserDAO struct {
 
 func NewUserDAO(db *gorm.DB) *UserDAO {
 	return &UserDAO{db: db}
+}
+
+func (dao *UserDAO) Insert(ctx context.Context, user User) error {
+	// 写入数据库
+
+	// 毫秒
+	now := time.Now().UnixMilli()
+	user.Ctime = now
+	user.Utime = now
+
+	err := dao.db.WithContext(ctx).Create(&user).Error
+
+	// 如果错误是MySQL错误类型
+	if me, ok := err.(*mysql.MySQLError); ok {
+		const duplicateErr uint16 = 1062
+		if me.Number == duplicateErr {
+			// 邮箱冲突
+			return ErrDuplicateEmail
+		}
+	}
+
+	// 系统错误
+	return err
 }
