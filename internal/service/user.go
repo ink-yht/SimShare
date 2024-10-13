@@ -4,10 +4,14 @@ import (
 	"SimShare/internal/domain"
 	"SimShare/internal/repository"
 	"context"
+	"errors"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var ErrDuplicateEmail = repository.ErrDuplicateEmail
+var (
+	ErrDuplicateEmail        = repository.ErrDuplicateEmail
+	ErrInvalidUserOrPassword = errors.New("用户不存在或密码不对")
+)
 
 type UserService struct {
 	repo *repository.UserRepository
@@ -29,4 +33,26 @@ func (svc *UserService) SignUp(ctx context.Context, user domain.User) error {
 
 	// 存起来
 	return svc.repo.Create(ctx, user)
+}
+
+func (svc *UserService) Login(ctx context.Context, email string, password string) (domain.User, error) {
+	user, err := svc.repo.FindByEmail(ctx, email)
+	// err 两种情况
+	// 1.系统错误
+	// 2.用户没找到
+
+	if err == repository.ErrRecordNotFound {
+		return domain.User{}, ErrInvalidUserOrPassword
+	}
+
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	// 密码校验
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
+		return domain.User{}, ErrInvalidUserOrPassword
+	}
+	return user, nil
 }

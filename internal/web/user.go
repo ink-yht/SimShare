@@ -50,8 +50,6 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 		return
 	}
 
-	fmt.Println(req)
-
 	isEmail, err := h.emailRexExp.MatchString(req.Email)
 	if err != nil {
 		ctx.JSON(http.StatusOK, gin.H{
@@ -102,14 +100,6 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 	// 1.系统错误
 	// 2.邮箱已注册
 
-	if err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 2,
-			"msg":  "系统错误",
-		})
-		return
-	}
-
 	if err == service.ErrDuplicateEmail {
 		ctx.JSON(http.StatusOK, gin.H{
 			"code": 1,
@@ -118,14 +108,54 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 		return
 	}
 
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 2,
+			"msg":  "系统错误",
+		})
+		return
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"code": 0,
-		"msg":  "登录成功",
+		"msg":  "注册成功",
 	})
 }
 
 func (h *UserHandler) Login(ctx *gin.Context) {
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
 
+	var req LoginReq
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	user, err := h.svc.Login(ctx, req.Email, req.Password)
+	if err == service.ErrInvalidUserOrPassword {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 1,
+			"msg":  "用户不存在或密码不对",
+		})
+		return
+	}
+
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 2,
+			"msg":  "系统错误",
+		})
+		return
+	}
+
+	fmt.Println(user)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"msg":  "登录成功",
+	})
 }
 
 func (h *UserHandler) Edit(ctx *gin.Context) {
