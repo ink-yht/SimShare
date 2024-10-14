@@ -3,8 +3,8 @@ package web
 import (
 	"SimShare/internal/domain"
 	"SimShare/internal/service"
-	"fmt"
 	regexp "github.com/dlclark/regexp2"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -150,7 +150,12 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 		return
 	}
 
-	fmt.Println(user)
+	// 步骤二
+	// 登陆成功了
+	// 设置 session
+	sess := sessions.Default(ctx)
+	sess.Set("userId", user.Id)
+	sess.Save()
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"code": 0,
