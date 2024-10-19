@@ -6,11 +6,12 @@ import (
 	"SimShare/internal/service"
 	"SimShare/internal/web"
 	middlelware "SimShare/internal/web/middleware"
-	"fmt"
+	"SimShare/pkg/ginx/middleware/ratelimit"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/redis"
+	"github.com/gin-contrib/sessions/memstore"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"strings"
@@ -41,6 +42,13 @@ func initUserHDL(db *gorm.DB, server *gin.Engine) {
 
 func initWebService() *gin.Engine {
 	server := gin.Default()
+
+	// 基于 Redis 的 IP 限流
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: "localhost:6380",
+	})
+	server.Use(ratelimit.NewBuilder(redisClient, time.Minute, 100).Build())
+
 	server.Use(cors.New(cors.Config{
 		//AllowOrigins:     []string{"https://foo.com"},
 		//AllowMethods:     []string{"PUT", "PATCH"},
@@ -60,11 +68,13 @@ func initWebService() *gin.Engine {
 	//store := cookie.NewStore([]byte("secret"))
 	//server.Use(sessions.Sessions("mysession", store))
 
-	store, err := redis.NewStore(16, "tcp", "localhost:6379", "", []byte("MKb1jQVV49L4FfjZ4QQW3rXhQ8IcaCem"))
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(store)
+	//store, err := redis.NewStore(16, "tcp", "localhost:6380", "", []byte("MKb1jQVV49L4FfjZ4QQW3rXhQ8IcaCem"))
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	store := memstore.NewStore([]byte("MKb1jQVV49L4FfjZ4QQW3rXhQ8IcaCem"))
+
 	server.Use(sessions.Sessions("mysession", store))
 
 	// 步骤四
