@@ -60,9 +60,18 @@ func initWebService() *gin.Engine {
 	server.Use(sessions.Sessions("mysession", store))
 
 	// 步骤四
-	server.Use(middlelware.NewLoginMiddlewareBuilder().IgnorePaths("/users/signup").IgnorePaths("users/login").Build())
+	//useSession(server)
+	useJWT(server)
 
 	return server
+}
+
+func useSession(server *gin.Engine) gin.IRoutes {
+	return server.Use(middlelware.NewLoginMiddlewareBuilder().IgnorePaths("/users/signup").IgnorePaths("/users/login").Build())
+}
+
+func useJWT(server *gin.Engine) gin.IRoutes {
+	return server.Use(middlelware.NewLoginJWTMiddlewareBuilder().IgnorePaths("/users/signup").IgnorePaths("/users/login").Build())
 }
 
 func initDB() *gorm.DB {

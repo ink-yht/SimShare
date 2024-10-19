@@ -3,10 +3,13 @@ package web
 import (
 	"SimShare/internal/domain"
 	"SimShare/internal/service"
+	"fmt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"net/http"
+	"time"
 )
 
 const (
@@ -33,7 +36,8 @@ func NewUserHandler(svc *service.UserService) *UserHandler {
 func (h *UserHandler) RegisterRouters(server *gin.Engine) {
 	UserGroup := server.Group("/users")
 	UserGroup.POST("/signup", h.SignUp)
-	UserGroup.POST("/login", h.Login)
+	//UserGroup.POST("/login", h.Login)
+	UserGroup.POST("/login", h.LoginJWT)
 	UserGroup.POST("/edit", h.Edit)
 	UserGroup.POST("/profile", h.Profile)
 }
@@ -157,6 +161,92 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 	sess.Set("userId", user.Id)
 	sess.Save()
 
+	// 设置 JWT 登录态
+	//claims := UserClaims{
+	//	Uid: user.Id,
+	//	RegisteredClaims: jwt.RegisteredClaims{
+	//		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 15)),
+	//	},
+	//}
+	//
+	//token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	//
+	//fmt.Println(token)
+	//
+	//tokenStr, err := token.SignedString([]byte("hcc9ByEkfLwmRUWLFEvr2RcPXhqecE12"))
+	//if err != nil {
+	//	ctx.JSON(http.StatusOK, gin.H{
+	//		"code": 1,
+	//		"msg":  "系统异常",
+	//	})
+	//	return
+	//}
+	//
+	//ctx.Header("x-jwt-token", tokenStr)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"msg":  "登录成功",
+	})
+}
+func (h *UserHandler) LoginJWT(ctx *gin.Context) {
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	var req LoginReq
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	user, err := h.svc.Login(ctx, req.Email, req.Password)
+	if err == service.ErrInvalidUserOrPassword {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 1,
+			"msg":  "用户不存在或密码不对",
+		})
+		return
+	}
+
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 2,
+			"msg":  "系统错误",
+		})
+		return
+	}
+
+	// 步骤二
+	// 登陆成功了
+	// 设置 session
+	//sess := sessions.Default(ctx)
+	//sess.Set("userId", user.Id)
+	//sess.Save()
+
+	// 设置 JWT 登录态
+	claims := UserClaims{
+		Uid: user.Id,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 15)),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	fmt.Println(token)
+
+	tokenStr, err := token.SignedString([]byte("hcc9ByEkfLwmRUWLFEvr2RcPXhqecE12"))
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 1,
+			"msg":  "系统异常",
+		})
+		return
+	}
+
+	ctx.Header("x-jwt-token", tokenStr)
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"msg":  "登录成功",
@@ -169,4 +259,10 @@ func (h *UserHandler) Edit(ctx *gin.Context) {
 
 func (h *UserHandler) Profile(ctx *gin.Context) {
 
+}
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	// 声明自己要放进去 token 里的数据
+	Uid int64
 }
