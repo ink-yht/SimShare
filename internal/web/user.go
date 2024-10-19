@@ -226,7 +226,8 @@ func (h *UserHandler) LoginJWT(ctx *gin.Context) {
 
 	// 设置 JWT 登录态
 	claims := UserClaims{
-		Uid: user.Id,
+		Uid:       user.Id,
+		UserAgent: ctx.Request.UserAgent(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Second * 55)),
 		},
@@ -286,7 +287,8 @@ func (h *UserHandler) ProfileJWT(ctx *gin.Context) {
 type UserClaims struct {
 	jwt.RegisteredClaims
 	// 声明自己要放进去 token 里的数据
-	Uid int64
+	Uid       int64
+	UserAgent string
 }
 
 var JWTKey = []byte("3vnkm3RPr55524y0uuG2PeEUPAT1t3PI")

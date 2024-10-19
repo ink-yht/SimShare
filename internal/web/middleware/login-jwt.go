@@ -62,6 +62,13 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 			return
 		}
 
+		// 增强系统的安全性
+		if uc.UserAgent != ctx.Request.UserAgent() {
+			// 严重的安全问题  加监控
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
 		expireTime := uc.ExpiresAt
 		// 不判定也可以
 		if expireTime.Before(time.Now()) {
