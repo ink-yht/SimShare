@@ -39,7 +39,7 @@ func (h *UserHandler) RegisterRouters(server *gin.Engine) {
 	//UserGroup.POST("/login", h.Login)
 	UserGroup.POST("/login", h.LoginJWT)
 	UserGroup.POST("/edit", h.Edit)
-	UserGroup.POST("/profile", h.Profile)
+	UserGroup.GET("/profile", h.ProfileJWT)
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
@@ -228,18 +228,16 @@ func (h *UserHandler) LoginJWT(ctx *gin.Context) {
 	claims := UserClaims{
 		Uid: user.Id,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 15)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Second * 55)),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	fmt.Println(token)
-
-	tokenStr, err := token.SignedString([]byte("hcc9ByEkfLwmRUWLFEvr2RcPXhqecE12"))
+	tokenStr, err := token.SignedString(JWTKey)
 	if err != nil {
 		ctx.JSON(http.StatusOK, gin.H{
-			"code": 1,
+			"code": 2,
 			"msg":  "系统异常",
 		})
 		return
@@ -261,8 +259,34 @@ func (h *UserHandler) Profile(ctx *gin.Context) {
 
 }
 
+func (h *UserHandler) ProfileJWT(ctx *gin.Context) {
+	uc := ctx.MustGet("claims").(UserClaims)
+	fmt.Println(uc.Uid)
+	ctx.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"msg":  "获取成功",
+		"data": uc.Uid,
+	})
+
+	//c, _ := ctx.Get("claims")
+	//
+	//fmt.Println(c)
+	//fmt.Println()
+	//claims, ok := c.(*UserClaims)
+	//if !ok {
+	//	ctx.JSON(http.StatusOK, gin.H{
+	//		"code": 2,
+	//		"msg":  "系统错误",
+	//	})
+	//	return
+	//}
+	//fmt.Println(claims.Uid)
+}
+
 type UserClaims struct {
 	jwt.RegisteredClaims
 	// 声明自己要放进去 token 里的数据
 	Uid int64
 }
+
+var JWTKey = []byte("3vnkm3RPr55524y0uuG2PeEUPAT1t3PI")

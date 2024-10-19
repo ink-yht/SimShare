@@ -6,9 +6,10 @@ import (
 	"SimShare/internal/service"
 	"SimShare/internal/web"
 	middlelware "SimShare/internal/web/middleware"
+	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -56,7 +57,14 @@ func initWebService() *gin.Engine {
 	}))
 
 	// 步骤一
-	store := cookie.NewStore([]byte("secret"))
+	//store := cookie.NewStore([]byte("secret"))
+	//server.Use(sessions.Sessions("mysession", store))
+
+	store, err := redis.NewStore(16, "tcp", "localhost:6379", "", []byte("MKb1jQVV49L4FfjZ4QQW3rXhQ8IcaCem"))
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(store)
 	server.Use(sessions.Sessions("mysession", store))
 
 	// 步骤四
@@ -75,7 +83,7 @@ func useJWT(server *gin.Engine) gin.IRoutes {
 }
 
 func initDB() *gorm.DB {
-	dsn := "root:root@tcp(127.0.0.1:3306)/SimShare?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root@tcp(localhost:13316)/SimShare?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn))
 	if err != nil {
 		panic(err)
