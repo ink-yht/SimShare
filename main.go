@@ -93,7 +93,7 @@ func useJWT(server *gin.Engine) gin.IRoutes {
 }
 
 func initDB() *gorm.DB {
-	dsn := "root:root@tcp(localhost:13316)/SimShare?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root@tcp(localhost:13317)/SimShare?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn))
 	if err != nil {
 		panic(err)

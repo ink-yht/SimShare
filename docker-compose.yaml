@@ -14,11 +14,11 @@ services:
       - ./script/mysql/:/docker-entrypoint-initdb.d/
     ports:
       #      注意这里我映射为了 13316 端口
-      - "13316:3306"
+      - "13317:3306"
   redis:
     image: 'bitnami/redis:7.2'
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     ports:
-      - '6380:6379'
+      - '6379:6379'
 #     一直用不上，注释掉先
