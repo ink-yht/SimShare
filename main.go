@@ -2,8 +2,10 @@ package main
 
 import (
 	"SimShare/internal/repository"
+	"SimShare/internal/repository/cache"
 	"SimShare/internal/repository/dao"
 	"SimShare/internal/service"
+	"SimShare/internal/service/sms/memory"
 	"SimShare/internal/web"
 	middlelware "SimShare/internal/web/middleware"
 	"SimShare/pkg/ginx/middleware/ratelimit"
@@ -22,9 +24,11 @@ func main() {
 
 	db := initDB()
 
+	rdb := initRedis()
+
 	server := initWebService()
 
-	initUserHDL(db, server)
+	initUserHDL(db, rdb, server)
 
 	err := server.Run(":8080")
 	if err != nil {
@@ -32,11 +36,17 @@ func main() {
 	}
 }
 
-func initUserHDL(db *gorm.DB, server *gin.Engine) {
+func initUserHDL(db *gorm.DB, rdb redis.Cmdable, server *gin.Engine) {
 	uDAO := dao.NewUserDAO(db)
-	repo := repository.NewUserRepository(uDAO)
+	uc := cache.NewUserCache(rdb)
+	repo := repository.NewUserRepository(uDAO, uc)
 	svc := service.NewUserService(repo)
-	u := web.NewUserHandler(svc)
+
+	codeCache := cache.NewCodeCache(rdb)
+	codeRepo := repository.NewCodeRepository(codeCache)
+	smsSvc := memory.NewService()
+	codeSvc := service.NewCodeService(codeRepo, smsSvc)
+	u := web.NewUserHandler(svc, codeSvc)
 	u.RegisterRouters(server)
 }
 
@@ -45,7 +55,7 @@ func initWebService() *gin.Engine {
 
 	// 基于 Redis 的 IP 限流
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: "localhost:6380",
+		Addr: "localhost:6379",
 	})
 	server.Use(ratelimit.NewBuilder(redisClient, time.Minute, 100).Build())
 
@@ -85,15 +95,23 @@ func initWebService() *gin.Engine {
 }
 
 func useSession(server *gin.Engine) gin.IRoutes {
-	return server.Use(middlelware.NewLoginMiddlewareBuilder().IgnorePaths("/users/signup").IgnorePaths("/users/login").Build())
+	return server.Use(middlelware.NewLoginMiddlewareBuilder().
+		IgnorePaths("/users/signup").
+		IgnorePaths("/users/login_sms/code/send").
+		IgnorePaths("/users/login_sms").
+		IgnorePaths("/users/login").Build())
 }
 
 func useJWT(server *gin.Engine) gin.IRoutes {
-	return server.Use(middlelware.NewLoginJWTMiddlewareBuilder().IgnorePaths("/users/signup").IgnorePaths("/users/login").Build())
+	return server.Use(middlelware.NewLoginJWTMiddlewareBuilder().
+		IgnorePaths("/users/signup").
+		IgnorePaths("/users/login_sms/code/send").
+		IgnorePaths("/users/login_sms").
+		IgnorePaths("/users/login").Build())
 }
 
 func initDB() *gorm.DB {
-	dsn := "root:root@tcp(localhost:13317)/SimShare?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root@tcp(localhost:13316)/SimShare?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn))
 	if err != nil {
 		panic(err)
@@ -104,4 +122,11 @@ func initDB() *gorm.DB {
 		panic(err)
 	}
 	return db
+}
+
+func initRedis() redis.Cmdable {
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: "127.0.0.1:6379",
+	})
+	return redisClient
 }

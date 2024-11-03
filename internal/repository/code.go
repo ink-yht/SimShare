@@ -23,7 +23,7 @@ func (repo *CodeRepository) Store(ctx context.Context, biz string, phone string,
 	return repo.cache.Set(ctx, biz, phone, code)
 }
 
-func (repo *CodeRepository) Verify(ctx context.Context, biz, phone, inputCode string) error {
-	_, err := repo.cache.Verify(ctx, biz, phone, inputCode)
-	return err
+func (repo *CodeRepository) Verify(ctx context.Context, biz, phone, inputCode string) (bool, error) {
+	ok, err := repo.cache.Verify(ctx, biz, phone, inputCode)
+	return ok, err
 }

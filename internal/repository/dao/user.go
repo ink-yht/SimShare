@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
@@ -9,14 +10,17 @@ import (
 )
 
 var (
-	ErrDuplicateEmail = errors.New("邮箱冲突")
+	ErrDuplicate      = errors.New("账号冲突")
 	ErrRecordNotFound = gorm.ErrRecordNotFound
 )
 
 type User struct {
-	Id       int64  `gorm:"primaryKey,autoIncrement"`
-	Email    string `gorm:"unique"`
+	Id       int64          `gorm:"primaryKey,autoIncrement"`
+	Email    sql.NullString `gorm:"unique"`
 	Password string
+	// 唯一索引冲突 改成 sql.NullString
+	// 唯一索引允许有多个空值，但不能有多个 ""
+	Phone sql.NullString `gorm:"unique"`
 	// 创建时间
 	Ctime int64
 	// 更新时间
@@ -46,7 +50,7 @@ func (dao *UserDAO) Insert(ctx context.Context, user User) error {
 		const duplicateErr uint16 = 1062
 		if me.Number == duplicateErr {
 			// 邮箱冲突
-			return ErrDuplicateEmail
+			return ErrDuplicate
 		}
 	}
 
@@ -57,6 +61,12 @@ func (dao *UserDAO) Insert(ctx context.Context, user User) error {
 func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
 	var user User
 	err := dao.db.WithContext(ctx).Where("email = ?", email).First(&user).Error
+	return user, err
+}
+
+func (dao *UserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
+	var user User
+	err := dao.db.WithContext(ctx).Where("phone = ?", phone).First(&user).Error
 	return user, err
 }
 

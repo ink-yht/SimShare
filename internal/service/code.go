@@ -10,16 +10,22 @@ import (
 
 const codeTelId = "1877556"
 
+var ErrCodeSetTooMany = repository.ErrCodeSetTooMany
+
 type CodeService struct {
 	repo   *repository.CodeRepository
 	smsSvc sms.Service
 }
 
+func NewCodeService(repo *repository.CodeRepository, smsSvc sms.Service) *CodeService {
+	return &CodeService{repo: repo, smsSvc: smsSvc}
+}
+
 // biz 区别业务场景
 
-func (svc *CodeService) Send(ctx context.Context, biz string, code string, phone string) error {
+func (svc *CodeService) Send(ctx context.Context, biz string, phone string) error {
 	// 生成验证码
-	code = svc.generateCode()
+	code := svc.generateCode()
 	// 塞进去 Redis
 	err := svc.repo.Store(ctx, biz, phone, code)
 	if err != nil {
@@ -37,7 +43,7 @@ func (svc *CodeService) Send(ctx context.Context, biz string, code string, phone
 	return nil
 }
 
-func (svc *CodeService) Verify(ctx context.Context, biz string, phone string, inputCode string) error {
+func (svc *CodeService) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {
 	return svc.repo.Verify(ctx, biz, phone, inputCode)
 }
 
@@ -45,5 +51,5 @@ func (svc *CodeService) generateCode() string {
 	// 六位数，num 在 0，999999 之间，包含 0 和 999999
 	num := rand.Intn(1000000)
 	// 不够六位的，加上前导 0 ， 000001
-	return fmt.Sprintf("%6d", num)
+	return fmt.Sprintf("%06d", num)
 }

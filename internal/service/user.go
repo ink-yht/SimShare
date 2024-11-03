@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	ErrDuplicateEmail        = repository.ErrDuplicateEmail
+	ErrDuplicate             = repository.ErrDuplicate
 	ErrInvalidUserOrPassword = errors.New("用户不存在或密码不对")
 )
 
@@ -56,6 +56,34 @@ func (svc *UserService) Login(ctx context.Context, email string, password string
 		return domain.User{}, ErrInvalidUserOrPassword
 	}
 	return user, nil
+}
+
+func (svc *UserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+	// 这个叫做快路径
+	u, err := svc.repo.FindByPhone(ctx, phone)
+	// 要判断有没有这个用户
+	if err != repository.ErrRecordNotFound {
+		// nil 会进来这里
+		// 不为 ErrRecordNotFound 也会
+		return u, err
+	}
+
+	// 在系统资源不足，触发降级之后，不执行慢路径了
+	//if ctx.Value("降级") == "true" {
+	//	return domain.User{}, errors.New("系统降级了")
+	//}
+
+	// 这个叫做慢路径
+	// 你明确知道没有这个用户
+	u = domain.User{
+		Phone: phone,
+	}
+	err = svc.repo.Create(ctx, u)
+	if err != nil && err != repository.ErrDuplicate {
+		return u, err
+	}
+	// 这里会遇到主从延迟的问题
+	return svc.repo.FindByPhone(ctx, phone)
 }
 
 func (svc *UserService) Profile(ctx context.Context, id int64) (domain.User, error) {

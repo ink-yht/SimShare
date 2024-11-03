@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const biz = "login"
+
 const (
 	emailRegexPattern    = "^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\\.[a-zA-Z0-9_-]+)+$"
 	passwordRegexPattern = "^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[._~!@#$^&*])[A-Za-z0-9._~!@#$^&*]{8,20}$"
@@ -21,15 +23,17 @@ type UserHandler struct {
 	emailRexExp *regexp.Regexp
 	passwordRex *regexp.Regexp
 	svc         *service.UserService
+	codeSvc     *service.CodeService
 }
 
 // 预编译提高校验速度
 
-func NewUserHandler(svc *service.UserService) *UserHandler {
+func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
 	return &UserHandler{
 		emailRexExp: regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRex: regexp.MustCompile(passwordRegexPattern, regexp.None),
 		svc:         svc,
+		codeSvc:     codeSvc,
 	}
 }
 
@@ -40,6 +44,108 @@ func (h *UserHandler) RegisterRouters(server *gin.Engine) {
 	UserGroup.POST("/login", h.LoginJWT)
 	UserGroup.POST("/edit", h.Edit)
 	UserGroup.GET("/profile", h.ProfileJWT)
+	UserGroup.POST("/login_sms/code/send", h.SendLoginSmsCode)
+	UserGroup.POST("/login_sms", h.LoginSms)
+}
+
+func (h *UserHandler) LoginSms(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	// 加上各种校验
+	ok, err := h.codeSvc.Verify(ctx, biz, req.Phone, req.Code)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 2,
+			Msg:  "系统错误",
+			Data: nil,
+		})
+		return
+	}
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 1,
+			Msg:  "验证码有误",
+		})
+		return
+	}
+
+	// 生成 jwt
+
+	// 手机号会不会是一个新用户？
+	user, err := h.svc.FindOrCreate(ctx, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 2,
+			Msg:  "系统错误",
+			Data: nil,
+		})
+		return
+	}
+	if err = h.setJWT(ctx, user.Id); err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 2,
+			Msg:  "系统错误",
+			Data: nil,
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, Result{
+		Code: 0,
+		Msg:  "验证码校验通过",
+		Data: nil,
+	})
+}
+
+func (h *UserHandler) SendLoginSmsCode(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+	}
+
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	// 校验是不是一个合格的手机号（正则）
+	if req.Phone == "" {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 1,
+			Msg:  "输入有误",
+			Data: nil,
+		})
+		return
+	}
+
+	err := h.codeSvc.Send(ctx, biz, req.Phone)
+
+	if err == service.ErrCodeSetTooMany {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 1,
+			Msg:  "发送验证码太频繁",
+		})
+		return
+	}
+
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 2,
+			"msg":  "系统错误",
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Code: 0,
+		Msg:  "发送成功",
+		Data: nil,
+	})
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
@@ -104,7 +210,7 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 	// 1.系统错误
 	// 2.邮箱已注册
 
-	if err == service.ErrDuplicateEmail {
+	if err == service.ErrDuplicate {
 		ctx.JSON(http.StatusOK, gin.H{
 			"code": 1,
 			"msg":  "邮箱已被注册",
@@ -224,9 +330,24 @@ func (h *UserHandler) LoginJWT(ctx *gin.Context) {
 	//sess.Set("userId", user.Id)
 	//sess.Save()
 
+	if err = h.setJWT(ctx, user.Id); err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 2,
+			"msg":  "系统异常",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"msg":  "登录成功",
+	})
+}
+
+func (h *UserHandler) setJWT(ctx *gin.Context, uid int64) error {
 	// 设置 JWT 登录态
 	claims := UserClaims{
-		Uid:       user.Id,
+		Uid:       uid,
 		UserAgent: ctx.Request.UserAgent(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Second * 55)),
@@ -237,19 +358,12 @@ func (h *UserHandler) LoginJWT(ctx *gin.Context) {
 
 	tokenStr, err := token.SignedString(JWTKey)
 	if err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 2,
-			"msg":  "系统异常",
-		})
-		return
+
+		return err
 	}
 
 	ctx.Header("x-jwt-token", tokenStr)
-
-	ctx.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "登录成功",
-	})
+	return nil
 }
 
 func (h *UserHandler) Edit(ctx *gin.Context) {
