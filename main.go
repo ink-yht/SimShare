@@ -9,26 +9,27 @@ import (
 	"SimShare/internal/web"
 	middlelware "SimShare/internal/web/middleware"
 	"SimShare/pkg/ginx/middleware/ratelimit"
-	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/memstore"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"strings"
 	"time"
 )
 
 func main() {
 
-	db := initDB()
+	//db := initDB()
+	//
+	//rdb := initRedis()
+	//
+	//server := initWebService()
+	//
+	//u := initUserHDL(db, rdb)
+	//u.RegisterRouters(server)
 
-	rdb := initRedis()
-
-	server := initWebService()
-
-	initUserHDL(db, rdb, server)
+	server := InitWebServer()
 
 	err := server.Run(":8080")
 	if err != nil {
@@ -36,7 +37,7 @@ func main() {
 	}
 }
 
-func initUserHDL(db *gorm.DB, rdb redis.Cmdable, server *gin.Engine) {
+func initUserHDL(db *gorm.DB, rdb redis.Cmdable) *web.UserHandler {
 	uDAO := dao.NewUserDAO(db)
 	uc := cache.NewUserCache(rdb)
 	repo := repository.NewUserRepository(uDAO, uc)
@@ -47,7 +48,7 @@ func initUserHDL(db *gorm.DB, rdb redis.Cmdable, server *gin.Engine) {
 	smsSvc := memory.NewService()
 	codeSvc := service.NewCodeService(codeRepo, smsSvc)
 	u := web.NewUserHandler(svc, codeSvc)
-	u.RegisterRouters(server)
+	return u
 }
 
 func initWebService() *gin.Engine {
@@ -59,20 +60,7 @@ func initWebService() *gin.Engine {
 	})
 	server.Use(ratelimit.NewBuilder(redisClient, time.Minute, 100).Build())
 
-	server.Use(cors.New(cors.Config{
-		//AllowOrigins:     []string{"https://foo.com"},
-		//AllowMethods:     []string{"PUT", "PATCH"},
-		AllowHeaders:     []string{"Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"x-jwt-token"},
-		AllowCredentials: true,
-		AllowOriginFunc: func(origin string) bool {
-			if strings.HasPrefix(origin, "http://localhost") {
-				return true
-			}
-			return strings.Contains(origin, "your.com")
-		},
-		MaxAge: 12 * time.Hour,
-	}))
+	server.Use()
 
 	// 步骤一
 	//store := cookie.NewStore([]byte("secret"))
@@ -103,11 +91,7 @@ func useSession(server *gin.Engine) gin.IRoutes {
 }
 
 func useJWT(server *gin.Engine) gin.IRoutes {
-	return server.Use(middlelware.NewLoginJWTMiddlewareBuilder().
-		IgnorePaths("/users/signup").
-		IgnorePaths("/users/login_sms/code/send").
-		IgnorePaths("/users/login_sms").
-		IgnorePaths("/users/login").Build())
+	return server.Use()
 }
 
 func initDB() *gorm.DB {
