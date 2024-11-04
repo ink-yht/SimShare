@@ -13,17 +13,24 @@ var (
 	ErrInvalidUserOrPassword = errors.New("用户不存在或密码不对")
 )
 
-type UserService struct {
-	repo *repository.UserRepository
+type UserService interface {
+	SignUp(ctx context.Context, user domain.User) error
+	Login(ctx context.Context, email string, password string) (domain.User, error)
+	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
+	Profile(ctx context.Context, id int64) (domain.User, error)
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
-	return &UserService{
+type userService struct {
+	repo repository.UserRepository
+}
+
+func NewUserService(repo repository.UserRepository) UserService {
+	return &userService{
 		repo: repo,
 	}
 }
 
-func (svc *UserService) SignUp(ctx context.Context, user domain.User) error {
+func (svc *userService) SignUp(ctx context.Context, user domain.User) error {
 	// 加密，然后存起来
 	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -36,7 +43,7 @@ func (svc *UserService) SignUp(ctx context.Context, user domain.User) error {
 
 }
 
-func (svc *UserService) Login(ctx context.Context, email string, password string) (domain.User, error) {
+func (svc *userService) Login(ctx context.Context, email string, password string) (domain.User, error) {
 	user, err := svc.repo.FindByEmail(ctx, email)
 	// err 两种情况
 	// 1.系统错误
@@ -58,7 +65,7 @@ func (svc *UserService) Login(ctx context.Context, email string, password string
 	return user, nil
 }
 
-func (svc *UserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+func (svc *userService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
 	// 这个叫做快路径
 	u, err := svc.repo.FindByPhone(ctx, phone)
 	// 要判断有没有这个用户
@@ -86,7 +93,7 @@ func (svc *UserService) FindOrCreate(ctx context.Context, phone string) (domain.
 	return svc.repo.FindByPhone(ctx, phone)
 }
 
-func (svc *UserService) Profile(ctx context.Context, id int64) (domain.User, error) {
+func (svc *userService) Profile(ctx context.Context, id int64) (domain.User, error) {
 	u, err := svc.repo.FindById(ctx, id)
 	return u, err
 }

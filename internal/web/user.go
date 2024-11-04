@@ -28,13 +28,13 @@ const (
 type UserHandler struct {
 	emailRexExp *regexp.Regexp
 	passwordRex *regexp.Regexp
-	svc         *service.UserService
-	codeSvc     *service.CodeService
+	svc         service.UserService
+	codeSvc     service.CodeService
 }
 
 // 预编译提高校验速度
 
-func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
+func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
 	return &UserHandler{
 		emailRexExp: regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRex: regexp.MustCompile(passwordRegexPattern, regexp.None),
@@ -64,8 +64,16 @@ func (h *UserHandler) LoginSms(ctx *gin.Context) {
 		return
 	}
 
-	// 加上各种校验
+	// 加上各种校验，再验证 code
 	ok, err := h.codeSvc.Verify(ctx, biz, req.Phone, req.Code)
+	if err == service.ErrCodeVerifyTooManyTimes {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 1,
+			Msg:  "验证次数太多",
+			Data: nil,
+		})
+		return
+	}
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 2,

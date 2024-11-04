@@ -11,19 +11,25 @@ import (
 const codeTelId = "1877556"
 
 var ErrCodeSetTooMany = repository.ErrCodeSetTooMany
+var ErrCodeVerifyTooManyTimes = repository.ErrCodeVerifyTooManyTimes
 
-type CodeService struct {
-	repo   *repository.CodeRepository
+type CodeService interface {
+	Send(ctx context.Context, biz string, phone string) error
+	Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error)
+}
+
+type codeService struct {
+	repo   repository.CodeRepository
 	smsSvc sms.Service
 }
 
-func NewCodeService(repo *repository.CodeRepository, smsSvc sms.Service) *CodeService {
-	return &CodeService{repo: repo, smsSvc: smsSvc}
+func NewCodeService(repo repository.CodeRepository, smsSvc sms.Service) CodeService {
+	return &codeService{repo: repo, smsSvc: smsSvc}
 }
 
 // biz 区别业务场景
 
-func (svc *CodeService) Send(ctx context.Context, biz string, phone string) error {
+func (svc *codeService) Send(ctx context.Context, biz string, phone string) error {
 	// 生成验证码
 	code := svc.generateCode()
 	// 塞进去 Redis
@@ -43,11 +49,11 @@ func (svc *CodeService) Send(ctx context.Context, biz string, phone string) erro
 	return nil
 }
 
-func (svc *CodeService) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {
+func (svc *codeService) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {
 	return svc.repo.Verify(ctx, biz, phone, inputCode)
 }
 
-func (svc *CodeService) generateCode() string {
+func (svc *codeService) generateCode() string {
 	// 六位数，num 在 0，999999 之间，包含 0 和 999999
 	num := rand.Intn(1000000)
 	// 不够六位的，加上前导 0 ， 000001

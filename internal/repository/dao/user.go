@@ -14,28 +14,22 @@ var (
 	ErrRecordNotFound = gorm.ErrRecordNotFound
 )
 
-type User struct {
-	Id       int64          `gorm:"primaryKey,autoIncrement"`
-	Email    sql.NullString `gorm:"unique"`
-	Password string
-	// 唯一索引冲突 改成 sql.NullString
-	// 唯一索引允许有多个空值，但不能有多个 ""
-	Phone sql.NullString `gorm:"unique"`
-	// 创建时间
-	Ctime int64
-	// 更新时间
-	Utime int64
+type UserDao interface {
+	Insert(ctx context.Context, user User) error
+	FindByEmail(ctx context.Context, email string) (User, error)
+	FindByPhone(ctx context.Context, phone string) (User, error)
+	FindById(ctx context.Context, id int64) (User, error)
 }
 
-type UserDAO struct {
+type GormUserDAO struct {
 	db *gorm.DB
 }
 
-func NewUserDAO(db *gorm.DB) *UserDAO {
-	return &UserDAO{db: db}
+func NewUserDAO(db *gorm.DB) UserDao {
+	return &GormUserDAO{db: db}
 }
 
-func (dao *UserDAO) Insert(ctx context.Context, user User) error {
+func (dao *GormUserDAO) Insert(ctx context.Context, user User) error {
 	// 写入数据库
 
 	// 毫秒
@@ -58,20 +52,33 @@ func (dao *UserDAO) Insert(ctx context.Context, user User) error {
 	return err
 }
 
-func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
+func (dao *GormUserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
 	var user User
 	err := dao.db.WithContext(ctx).Where("email = ?", email).First(&user).Error
 	return user, err
 }
 
-func (dao *UserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
+func (dao *GormUserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
 	var user User
 	err := dao.db.WithContext(ctx).Where("phone = ?", phone).First(&user).Error
 	return user, err
 }
 
-func (dao *UserDAO) FindById(ctx context.Context, id int64) (User, error) {
+func (dao *GormUserDAO) FindById(ctx context.Context, id int64) (User, error) {
 	var user User
 	err := dao.db.WithContext(ctx).Where("id = ?", id).First(&user).Error
 	return user, err
+}
+
+type User struct {
+	Id       int64          `gorm:"primaryKey,autoIncrement"`
+	Email    sql.NullString `gorm:"unique"`
+	Password string
+	// 唯一索引冲突 改成 sql.NullString
+	// 唯一索引允许有多个空值，但不能有多个 ""
+	Phone sql.NullString `gorm:"unique"`
+	// 创建时间
+	Ctime int64
+	// 更新时间
+	Utime int64
 }
